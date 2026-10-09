@@ -385,6 +385,37 @@ class TestReadFlows:
         assert response.json() == []
 
 
+class TestReadRecentFlows:
+    async def _create_flows(self, client, count: int) -> list[str]:
+        flow_ids = []
+        for i in range(count):
+            response = await client.post("/flows/", json={"name": f"my-flow-{i}"})
+            assert response.status_code == status.HTTP_201_CREATED
+            flow_ids.append(response.json()["id"])
+        return flow_ids
+
+    async def test_read_recent_flows_returns_empty_list(self, client):
+        response = await client.get("/flows/recent")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == []
+
+    async def test_read_recent_flows_returns_all_when_fewer_than_ten(self, client):
+        flow_ids = await self._create_flows(client, 3)
+
+        response = await client.get("/flows/recent")
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.json()) == 3
+        assert [flow["id"] for flow in response.json()] == flow_ids[::-1]
+
+    async def test_read_recent_flows_returns_ten_most_recently_created(self, client):
+        flow_ids = await self._create_flows(client, 11)
+
+        response = await client.get("/flows/recent")
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.json()) == 10
+        assert [flow["id"] for flow in response.json()] == flow_ids[:0:-1]
+
+
 class TestDeleteFlow:
     async def test_delete_flow(self, client):
         # first create a flow to delete
